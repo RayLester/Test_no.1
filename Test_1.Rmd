@@ -1,0 +1,28 @@
+---
+title: "Test_no.1"
+output: html_notebook
+---
+
+This notebook contains the answers to the UCT MA Psychology Multivariate Statistics Test 1.
+
+```{r}
+#To start:
+#First, load the packages we will need to complete these exercises
+library(pacman)
+p_load(tidyverse, haven)
+
+#Second, load the data sets we will be using
+delinquency_id.dat <- read_spss("Cambridge_delinquency_with_caseid.sav")
+delinquency.dat <- read_spss("Cambridge_delinquency.sav")
+conviction.dat <- read_spss("conviction_data.sav")
+
+#Third, check over the individual datasets to see the variables, their classes and general structure
+
+glimpse(conviction.dat)
+#This data is in 'long format' as each participant's ID is repeated length-ways a number of times for each age category in the data. 
+
+glimpse(delinquency_id.dat)
+#In this dataset we find a lot of missing data and the variable names are not very clear.This data us in 'wide format'.This dataset has 411 observations which is the same as what is mentioned in the documents, so this looks correct.
+```
+
+
