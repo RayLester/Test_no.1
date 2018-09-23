@@ -5,13 +5,14 @@ output: html_notebook
 
 This notebook contains the answers to the UCT MA Psychology Multivariate Statistics Test 1.
 
+Preparation
 ```{r}
 #To start:
 #First, load the packages we will need to complete these exercises
 library(pacman)
-p_load(tidyverse, haven)
+p_load(tidyverse, haven, psych)
 
-#Second, load the data sets we will be using
+#Second, load the data files we will be using
 delinquency_id.dat <- read_spss("Cambridge_delinquency_with_caseid.sav")
 delinquency.dat <- read_spss("Cambridge_delinquency.sav")
 conviction.dat <- read_spss("conviction_data.sav")
@@ -19,10 +20,26 @@ conviction.dat <- read_spss("conviction_data.sav")
 #Third, check over the individual datasets to see the variables, their classes and general structure
 
 glimpse(conviction.dat)
-#This data is in 'long format' as each participant's ID is repeated length-ways a number of times for each age category in the data. 
+#This data is in 'long format' as each participant's ID and conviction information is repeated length-ways a number of times for each age category in the data. There are seven distinct age categories, representing variables 5-11 in the codebook.
 
 glimpse(delinquency_id.dat)
-#In this dataset we find a lot of missing data and the variable names are not very clear.This data us in 'wide format'.This dataset has 411 observations which is the same as what is mentioned in the documents, so this looks correct.
+#In this data file it is clear there is some missing data and the variable names are not very understandable. This data is in 'wide format'.This dataset has 411 observations which is the same as the sample size mentioned in the documents, and 871 variables- which is 9 short of the full set mentioned in the codebook. However if one takes into account the seven age categories above, then it is only missing two from the full set mentioned in the codebook and these seem insignificant. It also includes an identification number.
+
+glimpse(delinquency.dat)
+#This data file has exactly one less variable in it than the data file with participant ID's. Based on a quick look at the data, it looks like the missing variable is V4, the ICPSR sequence ID number. The ID variable is likely to be quite useful for combining this data file with the conviction data file. Therefore, we will remove this data file from our environment as it unnecessarily duplicates information.
+
+rm(delinquency.dat)
+#After checking in my environment, we see that this worked and it has been removed.
 ```
 
+Question one
+```{r}
+#Separation from parents at ages 8-10 years, was found to be a key predictor of later offending (Farrington, 2001). However, seperation was not expanded on in great depth in the provided readings, despite there being a number of variables measuring this predictor in the data set. Therefore, this set of analyses intends to explore the relationship between the seperation from a parent and later offending in greater depth. 
+#Predictors: There are 13 variables that assess separation in the dataset. Six variables focus on seperation up to the age of 5 years. Seven variables focus on separations occuring up to age 10. The variables also seem to distinguish between separation from a mother, father or either parent. Lastly, the variables also seem to distinguish between the length of separation; being permanent,lasting for a long time or temporary. One separation variable (no.134) measures permanent separation from one or both parents, and in this way seems to conceptually overlap with variable 146, which measures separation from either parent which may or may not be permanent - for this reason it will be excluded from our analysis. Additionally, we already know a relationship exists between separation from parents and offending, so we will exclude all variables from our analysis that specify only that the child was separated from a parent. In other words, only variables that specifically add more information by stating whether the parent was a mother or father will be included in our data set for exploration. Therefore, the predictors we are intersted in include variables: 139, 140, 144, 145, 148, 149, 151, 152.
+#Dependent variable: We will have two dependent variables. First, We will be looking at predicting convictions across ages 10-24 years.This period takes into account juvenile offending and adult offending. As we are  interested in whether any convictions can be predicted, variable no. 11 seems appropriate for these analyses.In order to consider the extent of criminality, we will also include the variable 38, which considers the number of convictions a person had over 10-24 years of age.
+
+#In order to do this, we will need to first select the relevant variables from the originial data file to make a more manageable dataset.
+
+#We will also need to join this datafile to the convictions file.
+```
 
