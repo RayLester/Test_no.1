@@ -10,7 +10,7 @@ Preparation
 #To start:
 #First, load the packages we will need to complete these exercises
 library(pacman)
-p_load(tidyverse, haven, psych)
+p_load(tidyverse, haven, psych, vcd, magrittr, forcats, car, sjmisc, glm)
 
 #Second, load the data files we will be using
 delinquency_id.dat <- read_spss("Cambridge_delinquency_with_caseid.sav")
@@ -34,12 +34,148 @@ rm(delinquency.dat)
 
 Question one
 ```{r}
-#Separation from parents at ages 8-10 years, was found to be a key predictor of later offending (Farrington, 2001). However, seperation was not expanded on in great depth in the provided readings, despite there being a number of variables measuring this predictor in the data set. Therefore, this set of analyses intends to explore the relationship between the seperation from a parent and later offending in greater depth. 
-#Predictors: There are 13 variables that assess separation in the dataset. Six variables focus on seperation up to the age of 5 years. Seven variables focus on separations occuring up to age 10. The variables also seem to distinguish between separation from a mother, father or either parent. Lastly, the variables also seem to distinguish between the length of separation; being permanent,lasting for a long time or temporary. One separation variable (no.134) measures permanent separation from one or both parents, and in this way seems to conceptually overlap with variable 146, which measures separation from either parent which may or may not be permanent - for this reason it will be excluded from our analysis. Additionally, we already know a relationship exists between separation from parents and offending, so we will exclude all variables from our analysis that specify only that the child was separated from a parent. In other words, only variables that specifically add more information by stating whether the parent was a mother or father will be included in our data set for exploration. Therefore, the predictors we are intersted in include variables: 139, 140, 144, 145, 148, 149, 151, 152.
-#Dependent variable: We will have two dependent variables. First, We will be looking at predicting convictions across ages 10-24 years.This period takes into account juvenile offending and adult offending. As we are  interested in whether any convictions can be predicted, variable no. 11 seems appropriate for these analyses.In order to consider the extent of criminality, we will also include the variable 38, which considers the number of convictions a person had over 10-24 years of age.
+#Separation from parents at ages 8-10 years was found to be a key predictor of later offending (Farrington, 2001). However, the relationship between seperation and offending was not expanded on in great depth in the provided readings, despite there being a number of variables measuring this predictor in the data set. Therefore, this set of analyses intends to explore the relationship between the seperation from a parent and later offending in greater depth. 
+#Predictors: There are 13 variables that assess separation in the dataset. Six variables focus on seperation up to the age of 5 years. Seven variables focus on separations occuring up to age 10. The variables also seem to distinguish between separation from a mother, father or either parent. Lastly, the variables also seem to distinguish between the length of separation; being permanent,lasting for a long time or temporary. We will only use the variables that specify separation occurring before age 10 as these variables should take into account any separations occurring up to age 5 anyway. Additionally, as separation was only measured at two points in time, the above-mentioned relationship seems to refer to separation up to 10 years of age specifically. Also, we already know a relationship exists between separation from parents and offending, so we will exclude all variables from our analysis that specify only that the child was separated from a parent. In other words, only variables that specifically add more information by stating whether the parent was a mother or father will be included in our data set for exploration. These variables should allow us to explore the nature of separation and it's relationship with offending quite well as they take into account who the child was separated from and the length of time they were separated for, as well as the reasons for the separation. Therefore, the predictors we are interested in include variables: 134, 144, 145, 151, 152.
+#Dependent variable: We will use two dependent variables. First, We will be looking at predicting convictions across ages 10-24 years.This period takes into account juvenile offending and adult offending. As we are  interested in whether any convictions can be predicted, variable no. 11 seems appropriate for these analyses. In order to consider the extent of criminality, we will also include the variable 38, which considers the number of convictions a person had over 10-24 years of age.
 
-#In order to do this, we will need to first select the relevant variables from the originial data file to make a more manageable dataset.
+#In order to complete this analysis, we will need to first select the relevant variables from the originial data file to make a more manageable dataset.We will also rename them so they make more sense.
+reduced_delinquency_id.dat <- delinquency_id.dat %>% 
+  select(ID = v4, no_convictions_10_24 = v38, 
+         broken_home = v134, sep_father_10 = v144, 
+         sep_mother_10 = v145, temp_sep_father_10 = v151, 
+         temp_sep_mother_10 = v152)
+#This dataset retains the 411 observations, and now only includes the 7 variables of interest.
 
-#We will also need to join this datafile to the convictions file.
+#We will also need to join this dataset to the convictions file. First we need to convert the convictions data file to a length-ways data file, and ensure the joining variable is named the same.
+wide_conviction.dat <- conviction.dat %>% 
+  spread(key = agecat, value = convicted) %>% 
+  rename(ID = icpsr_seq_id_number)
+#This went well, as now we have 411 observations with eight variables which is what we expected. 
+
+#Joining the two files
+joined.dat <- full_join(wide_conviction.dat, reduced_delinquency_id.dat, by = "ID")
+#This also went to plan because we have retained our 411 observations and have 14 variables now. Additionally, all our variable names make sense.This dataset shall be carried forward and used in analysis.
 ```
+
+Question 2
+```{r}
+#First we will explore the data in relation to the conviction data across ages 10-24.
+table(joined.dat$convicted_10_24)
+#According to the codebook, 1 = no and 2 = yes.This means that 265 people over 14 years (from when they were 10 years old to 24 years old) were not convicted of a criminal offence, while 136 were.However, this only adds to 401.
+summary(joined.dat)
+#Here we see that indeed 10 answers are missing for this dependent variable, but that there were only two coding options - making this dependent variable suitable for use in a logistic regression.
+str(joined.dat)
+#This gives us a bit more information about the classes of the variables. Convicted from 10-24 is coded as a numeric variable when it is a categorical variable, so this will need to change. It looks like we will also need to change all our predictors in the same way.
+
+#changing the variable classes and further selection for exploration with this dependent variable
+convicted_y_n_joined.dat <- joined.dat %>% 
+  select(convicted_10_24,broken_home,sep_father_10, 
+         sep_mother_10, temp_sep_father_10, temp_sep_mother_10) %>% 
+  mutate_if(is.numeric, as.factor)
+#This worked as now all our variables of interest are factors.We have also reduced our dataset again strictly to just those variables of interest.
+
+summary(convicted_y_n_joined.dat)
+#These descriptives provide a complete count of the number of boys belonging to each category for each variable. Across all the counts we can see that majority of the boys (around 300) were coded 1 for each type of separation - indicating that most of the sample was not separated from a parent, no matter the type of separation considered.
+
+#It would be useful if we could see the count for the number of boys in each category for each type of separation, by their offending outcome.
+
+#Convicted vs broken homes
+convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, broken_home) 
+#Here we see that of the boys who were not from a broken home, 239 were not convicted, but 115 who were. Of the boys who were from a broken home but only due to death, 11 were not convicted and a similarly small number of 5 were. Of the boys who were from a broken home for other reasons, almost identical numbers were and were not convicted. 
+
+#separations from father before 10
+convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, sep_father_10) 
+#Here we find that of the boys that were not separated from their father before turning 10, 180 were not convicted, but 73 were. Of the boys that were separated from their father due to a hospital visit or death, 44 were not later convicted, but 21 were. Of the boys that were separated from their father for other reasons, similar numbers of boys were and were not convicted.
+
+#separations from mother before 10
+convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, sep_mother_10) 
+#Here we see that of the boys that were not separated from their mother before turning 10, 201 were not later convicted, and only 86 were. Of those that were separated due to death or a hospital stay, 45 did not go on to be convicted where are 28 did. Of the boys that were separated for other reasons, again very similar numbers went on to not get convicted and get convicted. 
+
+#temporary separations from father before 10
+convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, temp_sep_father_10)
+#Of the boys that were not temporarily separated from their father before 10 years of age, 195 did not get convicted, but 78 did. of Those that were temporarily separated due to a hospital stay, 28 did not get later convicted but 22 did. Of those that were temporarily separated for other reasons, 32 did not get convicted but 22 did - the biggest difference so far for this category.
+
+#temporary separations from mother before 10
+convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, temp_sep_mother_10)
+#here we see that of the boys not temporarily separated, 202 did not go on to get convicted while 92 did. Of those that were separated for a short time due to a hospital stay, 45 did not go on to get convicted but 26 did. Exactly the same number of boys who got temporarily separated for other reasons did and didn't become convicts.
+
+#However, it would perhaps be more useful to just have a set of data that compares seperated vs not separated, instead of by separation being split by reasons. 
+sep_convicted_y_n_joined.dat<- 
+  rec(convicted_y_n_joined.dat, broken_home, sep_father_10, sep_mother_10, temp_sep_father_10, temp_sep_mother_10, rec = "1=1; 2=2; 3=2", append =  T)
+#This seems correctly coded as 411 observaions are still here and 5 additional recoded variables.Briefly scanning over it looks like all 3's have now become 2's as well. yay! SO let's try again to spot a trend.
+
+#Convicted vs broken homes with  - separated vs not
+sep_convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, broken_home_r) 
+#Here it is clear to see that of the boys who were from broken homes for one reason or another, almost the same number did and didn't go on to later get convicted, with marginally more going on to not get a conviction.
+#visually this is quite clearly seen here:
+mosaic(~convicted_10_24 + broken_home_r, data = sep_convicted_y_n_joined.dat)
+
+#Convicted vs separations from father before 10  - separated vs not
+sep_convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, sep_father_10_r) 
+mosaic(~convicted_10_24 + sep_father_10_r, data = sep_convicted_y_n_joined.dat)
+#Of the boys that were separated from their father for one reason or another, quite a few more didn't go on to convict than those who did.
+
+#Convicted vs separations from mother before 10  - separated vs not
+sep_convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, sep_mother_10_r) 
+mosaic(~convicted_10_24 + sep_mother_10_r, data = sep_convicted_y_n_joined.dat)
+#Of the boys that were separated from their mother for one reason or another, again quite a few more did not go on to convict than those that did.
+
+#Convicted vs temporary separations from father before 10  - separated vs not
+sep_convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, temp_sep_father_10_r) 
+mosaic(~convicted_10_24 + temp_sep_father_10_r, data = sep_convicted_y_n_joined.dat)
+#Of the boys that were temporarily separated from their father for one reason or another, again, more didn't go on to convict than those that did.
+
+#Convicted vs temporary separations from mother before 10  - separated vs not
+sep_convicted_y_n_joined.dat %>% 
+  count(convicted_10_24, temp_sep_mother_10_r)
+mosaic(~convicted_10_24 + temp_sep_mother_10_r, data = sep_convicted_y_n_joined.dat)
+#Of the boys that were temporarily separated from their mother for one reason or another,quite a few more seemed to go on not to be convicted than those that did.
+
+#Hmmm, across all the groups it seems as though the most populated category always included boys who were not separated from a parent and not convicted. When comparing across all the types of separation, of the boys that were separated more did not go on to get convictions than those who did.The smallest difference between boys who were separated and convicted or not convicted, occurred for those from broken homes. Gender seems to be related in some way as for boys that were separated, there were more boys that did and didn't get convicted when they were seperated from their father. There also seemed to be some indication of a relationship with the length of time they were separated for, as more boys were both convicted and not convicted when they were separated for longer from a parent. In both instances of being separated from a mother, being separated as a result of death or a hospital visit was associated with more convictions and non convictions, than being separated as a result of other reasons. However, in the instance children were separated from their fathers, more convictions were noted for when separation resulted from other reasons.Therefore, parental reason for separation seemed to be related to conviction.There was a small difference in the number of convictions for longer vs temporary separation. 
+```
+
+Question 3
+```{r}
+#As the dependant variable is binary, we will run a logisitic regression. Additionally, as we suspest the reason related to a parent's absence may be important to consider we will work with the data that includes this detail.
+
+#First we split the data into a training and test set.
+set.seed(2)
+train.dat <- dplyr::sample_frac(convicted_y_n_joined.dat, 0.75)
+test.dat <- dplyr::setdiff(convicted_y_n_joined.dat, train.dat)
+
+convict.mod1 <- train.dat %>% 
+  glm(convicted_10_24 ~., family = "binomial")
+summary(convict.mod1)
+1- pchisq(convict.mod1$deviance, convict.mod1$df.residual)
+
+#How much does separation from a mother add
+convict.modboth <- train.dat %>% 
+  glm(convicted_10_24 ~ sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial")
+
+convict.modfather <-train.dat %>% 
+  glm(convicted_10_24~sep_father_10 + temp_sep_father_10, family = "binomial")
+
+nestedanova1 <- anova(convict.modboth, convict.modfather)
+lrtest(convict.modboth, convict.modfather)
+
+#How much does temporary separation add
+convict.modallsep <- train.dat %>% 
+  glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial")
+
+convict.modlongsep <- train.dat %>% 
+  glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10, family = "binomial")
+
+nestedanova2 <- anova(convict.modallsep, convict.modlongsep)
+lrtest(convict.modallsep, convict.modlongsep)
+```
+
 
