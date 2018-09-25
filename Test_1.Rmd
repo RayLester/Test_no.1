@@ -1,6 +1,7 @@
 ---
 title: "Test_no.1"
 output: html_notebook
+author: Soraya Lester (LSTSOR001)
 ---
 
 This notebook contains the answers to the UCT MA Psychology Multivariate Statistics Test 1.
@@ -10,7 +11,7 @@ Preparation
 #To start:
 #First, load the packages we will need to complete these exercises
 library(pacman)
-p_load(tidyverse, haven, psych, vcd, magrittr, forcats, car, sjmisc, glm)
+p_load(tidyverse, haven, psych, vcd, magrittr, forcats, car, sjmisc, caret, lmtest)
 
 #Second, load the data files we will be using
 delinquency_id.dat <- read_spss("Cambridge_delinquency_with_caseid.sav")
@@ -36,7 +37,7 @@ Question one
 ```{r}
 #Separation from parents at ages 8-10 years was found to be a key predictor of later offending (Farrington, 2001). However, the relationship between seperation and offending was not expanded on in great depth in the provided readings, despite there being a number of variables measuring this predictor in the data set. Therefore, this set of analyses intends to explore the relationship between the seperation from a parent and later offending in greater depth. 
 #Predictors: There are 13 variables that assess separation in the dataset. Six variables focus on seperation up to the age of 5 years. Seven variables focus on separations occuring up to age 10. The variables also seem to distinguish between separation from a mother, father or either parent. Lastly, the variables also seem to distinguish between the length of separation; being permanent,lasting for a long time or temporary. We will only use the variables that specify separation occurring before age 10 as these variables should take into account any separations occurring up to age 5 anyway. Additionally, as separation was only measured at two points in time, the above-mentioned relationship seems to refer to separation up to 10 years of age specifically. Also, we already know a relationship exists between separation from parents and offending, so we will exclude all variables from our analysis that specify only that the child was separated from a parent. In other words, only variables that specifically add more information by stating whether the parent was a mother or father will be included in our data set for exploration. These variables should allow us to explore the nature of separation and it's relationship with offending quite well as they take into account who the child was separated from and the length of time they were separated for, as well as the reasons for the separation. Therefore, the predictors we are interested in include variables: 134, 144, 145, 151, 152.
-#Dependent variable: We will use two dependent variables. First, We will be looking at predicting convictions across ages 10-24 years.This period takes into account juvenile offending and adult offending. As we are  interested in whether any convictions can be predicted, variable no. 11 seems appropriate for these analyses. In order to consider the extent of criminality, we will also include the variable 38, which considers the number of convictions a person had over 10-24 years of age.
+#Dependent variable: We will be looking at predicting convictions across ages 10-24 years.This period takes into account juvenile offending and adult offending. As we are  interested in whether any convictions can be predicted, variable no. 11 seems appropriate for these analyses.
 
 #In order to complete this analysis, we will need to first select the relevant variables from the originial data file to make a more manageable dataset.We will also rename them so they make more sense.
 reduced_delinquency_id.dat <- delinquency_id.dat %>% 
@@ -59,7 +60,8 @@ joined.dat <- full_join(wide_conviction.dat, reduced_delinquency_id.dat, by = "I
 
 Question 2
 ```{r}
-#First we will explore the data in relation to the conviction data across ages 10-24.
+#First we will explore the separation data in relation to the conviction data across ages 10-24.
+
 table(joined.dat$convicted_10_24)
 #According to the codebook, 1 = no and 2 = yes.This means that 265 people over 14 years (from when they were 10 years old to 24 years old) were not convicted of a criminal offence, while 136 were.However, this only adds to 401.
 summary(joined.dat)
@@ -106,7 +108,8 @@ convicted_y_n_joined.dat %>%
 
 #However, it would perhaps be more useful to just have a set of data that compares seperated vs not separated, instead of by separation being split by reasons. 
 sep_convicted_y_n_joined.dat<- 
-  rec(convicted_y_n_joined.dat, broken_home, sep_father_10, sep_mother_10, temp_sep_father_10, temp_sep_mother_10, rec = "1=1; 2=2; 3=2", append =  T)
+  rec(convicted_y_n_joined.dat, broken_home, sep_father_10, sep_mother_10, temp_sep_father_10, temp_sep_mother_10, rec = "1=1; 2=2; 3=2", append =  T) %>% 
+    mutate_if(is.numeric, as.factor)
 #This seems correctly coded as 411 observaions are still here and 5 additional recoded variables.Briefly scanning over it looks like all 3's have now become 2's as well. yay! SO let's try again to spot a trend.
 
 #Convicted vs broken homes with  - separated vs not
@@ -148,34 +151,82 @@ Question 3
 #As the dependant variable is binary, we will run a logisitic regression. Additionally, as we suspest the reason related to a parent's absence may be important to consider we will work with the data that includes this detail.
 
 #First we split the data into a training and test set.
-set.seed(2)
-train.dat <- dplyr::sample_frac(convicted_y_n_joined.dat, 0.75)
-test.dat <- dplyr::setdiff(convicted_y_n_joined.dat, train.dat)
+set.seed(1)
+train.dat <- sample_frac(convicted_y_n_joined.dat, 0.75)
+test.dat <- setdiff(convicted_y_n_joined.dat, train.dat)
 
-convict.mod1 <- train.dat %>% 
-  glm(convicted_10_24 ~., family = "binomial")
-summary(convict.mod1)
-1- pchisq(convict.mod1$deviance, convict.mod1$df.residual)
 
-#How much does separation from a mother add
-convict.modboth <- train.dat %>% 
-  glm(convicted_10_24 ~ sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial")
+#Second,test to see how much separation from a mother adds
+#broken home was not included in this model because the parent the child was separated from was not specified, additionally it had the potential to be both parents.
+#the first model contains all the variables relating to both parents, while the second includes only the variables related to the father.
+convict.modboth <- glm(convicted_10_24 ~ sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial", data = train.dat)
+summary(convict.modboth)
+#None of the variables appeared to be significant in this model, except temporary separation from a father for other reasons. There is only a small difference between null deviance and the residual deviance, suggesting our model is not doing much better than the null model. 
 
-convict.modfather <-train.dat %>% 
-  glm(convicted_10_24~sep_father_10 + temp_sep_father_10, family = "binomial")
+convict.modfather <- glm(convicted_10_24 ~ sep_father_10 + temp_sep_father_10, family = "binomial", data = train.dat)
+summary(convict.modfather)
+#However, in this model not a single variable significantly predicted offending.The difference between the null deviance and the residual deviance is even smaller here, suggesting this model is the worse of the two.
 
-nestedanova1 <- anova(convict.modboth, convict.modfather)
+#test each model for significance
+1-pchisq(convict.modboth$deviance,
+         convict.modboth$df.residual)  
+#This value is very small, indicating the model is not very good
+1-pchisq(convict.modfather$deviance,
+         convict.modfather$df.residual) 
+#This value is even smaller, indicating the same thing.
+
+#comparing the models
+anova1 <- anova(convict.modfather, convict.modboth)
 lrtest(convict.modboth, convict.modfather)
+#something about model two is significant, hmmm
 
-#How much does temporary separation add
-convict.modallsep <- train.dat %>% 
-  glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial")
+#checking the overall accuracy of the models
+pred_convict.modfather <- predict(convict.modfather, train.dat, type = "response")
+table(round(pred_convict.modfather + 0.5), train.dat$convicted_10_24)
+confusionMatrix(as.factor(round(pred_convict.modfather + 0.5)), as.factor(train.dat$convicted_10_24))
+#The accuracy of this model is not great.
 
-convict.modlongsep <- train.dat %>% 
-  glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10, family = "binomial")
+pred_convict.modboth <- predict(convict.modboth, train.dat, type = "response")
+table(round(pred_convict.modboth + 0.5), train.dat$convicted_10_24)
+confusionMatrix(as.factor(round(pred_convict.modboth + 0.5)), as.factor(train.dat$convicted_10_24))
+#The accuracy of this model is also not great.
 
-nestedanova2 <- anova(convict.modallsep, convict.modlongsep)
+#Third, test to see how much temporary separation adds
+#broken home and the separation variables seem to relate to longer periods of separation than temporary separation variables.
+convict.modallsep <- glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10 + temp_sep_father_10 + temp_sep_mother_10, family = "binomial", data = train.dat)
+summary(convict.modallsep)
+#Here none of the variables significantly predict conviction.The difference between the null deviance and residual deviance is again really quite small, suggesting we have another crummy model.
+
+convict.modlongsep <- glm(convicted_10_24 ~ broken_home + sep_father_10 + sep_mother_10, family = "binomial", data = train.dat)
+summary(convict.modlongsep)
+#The only significant predictor of conviction to have emerged here is again separation from a father for another reason. But the difference between the null deviance and residual deviance is even smaller.
+
+#test each model for significance
+1-pchisq(convict.modallsep$deviance,
+         convict.modallsep$df.residual) 
+#such a small figure suggests the model is not significant
+
+1-pchisq(convict.modlongsep$deviance,
+         convict.modlongsep$df.residual) 
+#it gets worse
+
+#comparing the models
+anova2 <- anova(convict.modlongsep, convict.modallsep)
 lrtest(convict.modallsep, convict.modlongsep)
+#something about model 2 is significant, double hmmm
+
+#checking the overall accuracy of the models
+pred_convict.modallsep <- predict(convict.modallsep, train.dat, type = "response")
+table(round(pred_convict.modallsep + 0.5), train.dat$convicted_10_24)
+confusionMatrix(as.factor(round(pred_convict.modallsep + 0.5)), as.factor(train.dat$convicted_10_24))
+#this model has the same underwhelming level of accuracy as those above
+
+pred_convict.modlongsep <- predict(convict.modlongsep, train.dat, type = "response")
+table(round(pred_convict.modlongsep + 0.5), train.dat$convicted_10_24)
+confusionMatrix(as.factor(round(pred_convict.modlongsep + 0.5)), as.factor(train.dat$convicted_10_24))
+#this model is also not very accurate. 
+
+#Conclusion: either Farrington and West have lied to us all, or I have done a poor job at modelling 
 ```
 
 
